@@ -593,7 +593,7 @@ class CrossModel(nn.Module):
         #     db_label,
         #     db_con_mask,
         # )
-        embedding_alignment_loss = alignment_loss(db_user_emb, self.embeddings.weight, db_label, db_con_mask)
+        embedding_alignment_loss = self.alignment_loss(db_user_emb, self.embeddings.weight, db_label, db_con_mask)
         entity_selection_loss = 0
 
         # entity_scores = F.softmax(entity_scores.cuda(), dim=-1).cuda()
