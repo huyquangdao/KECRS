@@ -621,9 +621,9 @@ class CrossModel(nn.Module):
             # use teacher forcing
             scores, preds = self.decode_forced(
                 encoder_states,
-                None,
-                None,
-                None,
+                (None, None),
+                (None, None),
+                (None, None),
                 db_user_emb,
                 mask_ys,
             )
@@ -632,9 +632,9 @@ class CrossModel(nn.Module):
         else:
             scores, preds = self.decode_greedy(
                 encoder_states,
-                None,
-                None,
-                None,
+                (None, None),
+                (None, None),
+                (None, None),
                 db_user_emb,
                 bsz,
                 maxlen or self.longest_label,
