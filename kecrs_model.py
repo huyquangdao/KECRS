@@ -285,13 +285,17 @@ class CrossModel(nn.Module):
             # batch*1*hidden
             scores = scores[:, -1:, :]
             # scores = self.output(scores)
-            kg_attn_norm = self.kg_attn_norm(attention_kg)
+            # kg_attn_norm = self.kg_attn_norm(attention_kg)
 
             db_attn_norm = self.db_attn_norm(attention_db)
 
             copy_latent = self.copy_norm(
                 torch.cat(
-                    [kg_attn_norm.unsqueeze(1), db_attn_norm.unsqueeze(1), scores], -1
+                    [
+                        # kg_attn_norm.unsqueeze(1),
+                         db_attn_norm.unsqueeze(1), 
+                         scores], 
+                         -1
                 )
             )
 
