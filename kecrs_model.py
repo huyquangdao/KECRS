@@ -208,7 +208,7 @@ class CrossModel(nn.Module):
         )
 
         self.dbpedia_RGCN2 = RGCNConv(
-            opt["n_entity"], self.dim, self.n_relation, num_bases=opt["num_bases"]
+            self.dim, self.dim, self.n_relation, num_bases=opt["num_bases"]
         )
 
         self.w_proj = nn.Linear(self.dim * 2, self.dim)
