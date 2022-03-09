@@ -174,7 +174,7 @@ class CrossModel(nn.Module):
         )
 
         self.entity_selection_norm = nn.Linear(
-            opt["embedding_size"] + opt["embedding_size"], self.dim, bias = False
+            opt["embedding_size"] + opt["embedding_size"], opt["dim"], bias = False
         )
         self.entity_selection_bias = nn.Parameter(torch.zeros(len(dictionary) + 4))
 
