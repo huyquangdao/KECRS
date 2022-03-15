@@ -550,7 +550,7 @@ class CrossModel(nn.Module):
         db_nodes_features_1 = torch.relu(self.dbpedia_RGCN(None, self.db_edge_idx, self.db_edge_type))
         db_nodes_features_2 = torch.relu(self.dbpedia_RGCN2(db_nodes_features_1, self.db_edge_idx, self.db_edge_type))
 
-        # db_nodes_features = self.w_proj(torch.cat([db_nodes_features_1, db_nodes_features_2], dim =-1))
+        db_nodes_features = self.w_proj(torch.cat([db_nodes_features_1, db_nodes_features_2], dim =-1))
 
         # con_nodes_features = self.concept_GCN(
         #     self.concept_embeddings.weight, self.concept_edge_sets
