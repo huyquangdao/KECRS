@@ -279,17 +279,17 @@ class dataset(object):
 
             # neighborhood intercoporation
             neighbors = []
-            for id in line["entity"]:
-                one_hops_neighbors, two_hops_neighbors = get_2_hops_neighbors_via_kg(
-                    self.subkg,
-                    id,
-                    self.relation_counts,
-                    max_neighbors=self.max_neighbors,
-                    type_sampling=self.type_sampling,
-                    node_degree=self.node_degree,
-                )
-                neighbors.extend(one_hops_neighbors)
-            final_entity = line["entity"] + neighbors
+            # for id in line["entity"]:
+            #     one_hops_neighbors, two_hops_neighbors = get_2_hops_neighbors_via_kg(
+            #         self.subkg,
+            #         id,
+            #         self.relation_counts,
+            #         max_neighbors=self.max_neighbors,
+            #         type_sampling=self.type_sampling,
+            #         node_degree=self.node_degree,
+            #     )
+            #     neighbors.extend(one_hops_neighbors)
+            # final_entity = line["entity"] + neighbors
 
             data_set.append(
                 [
@@ -299,7 +299,7 @@ class dataset(object):
                     r_length,
                     np.array(mask_response),
                     mask_r_length,
-                    final_entity,
+                    line["entity"],
                     line["movie"],
                     concept_mask,
                     dbpedia_mask,
