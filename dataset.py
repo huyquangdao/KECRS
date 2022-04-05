@@ -396,7 +396,6 @@ class dataset(object):
                 try:
                     entity = self.entityid2entity[en]
                     en_words = self.entity_url2text[entity]
-                    print(en_words)
                     words = word_tokenize(en_words)
                     word_ids = [self.word2index[word] for word in words if word in self.word2index]
                     all_word_ids.extend(word_ids)
@@ -511,7 +510,6 @@ class dataset(object):
                 #####
                  movie_rec.append(word[1:])
 
-        
         movie_rec_trans = []
         for movie in set(movie_rec):
             try:
