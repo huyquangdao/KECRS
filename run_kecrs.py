@@ -1,3 +1,4 @@
+%%writefile run.py
 #!/usr/bin/env python3
 
 # Copyright (c) Facebook, Inc. and its affiliates.
@@ -86,7 +87,7 @@ def setup_args():
     train.add_argument(
         "-embedding_type", "--embedding_type", type=str, default="random"
     )
-    train.add_argument("-epoch", "--epoch", type=int, default=2)
+    train.add_argument("-epoch", "--epoch", type=int, default=3)
     train.add_argument("-gpu", "--gpu", type=str, default="0,1")
     train.add_argument("-gradient_clip", "--gradient_clip", type=float, default=0.1)
     train.add_argument("-embedding_size", "--embedding_size", type=int, default=300)
@@ -160,7 +161,7 @@ class TrainLoop_fusion_rec:
             self.load_data = False
         self.is_finetune = False
 
-        self.movie_ids = pkl.load(open("data/movie_ids.pkl", "rb"))
+        self.movie_ids = pkl.load(open("generated_data/final_movie_ids.pkl", "rb"))
         # Note: we cannot change the type of metrics ahead of time, so you
         # should correctly initialize to floats or ints here
 
@@ -212,84 +213,6 @@ class TrainLoop_fusion_rec:
         losses = []
         best_val_rec = 0
         rec_stop = False
-
-        # if self.train_MIM:
-
-        #     print("Pretraining MIM objective ... ")
-
-        #     for i in range(3):
-        #         train_set = CRSdataset(
-        #             self.train_dataset.data_process(),
-        #             self.opt["n_entity"],
-        #             self.opt["n_concept"],
-        #         )
-        #         train_dataset_loader = torch.utils.data.DataLoader(
-        #             dataset=train_set, batch_size=self.batch_size, shuffle=False
-        #         )
-        #         num = 0
-        #         for (
-        #             context,
-        #             c_lengths,
-        #             response,
-        #             r_length,
-        #             mask_response,
-        #             mask_r_length,
-        #             entity,
-        #             entity_vector,
-        #             movie,
-        #             concept_mask,
-        #             dbpedia_mask,
-        #             concept_vec,
-        #             db_vec,
-        #             rec,
-        #         ) in tqdm(train_dataset_loader):
-        #             seed_sets = []
-        #             batch_size = context.shape[0]
-        #             for b in range(batch_size):
-        #                 seed_set = entity[b].nonzero().view(-1).tolist()
-        #                 seed_sets.append(seed_set)
-        #             self.model.train()
-        #             self.zero_grad()
-
-        #             (
-        #                 scores,
-        #                 preds,
-        #                 rec_scores,
-        #                 rec_loss,
-        #                 gen_loss,
-        #                 mask_loss,
-        #                 info_db_loss,
-        #                 _,
-        #             ) = self.model(
-        #                 context.cuda(),
-        #                 response.cuda(),
-        #                 mask_response.cuda(),
-        #                 concept_mask,
-        #                 dbpedia_mask,
-        #                 seed_sets,
-        #                 movie,
-        #                 concept_vec,
-        #                 db_vec,
-        #                 entity_vector.cuda(),
-        #                 rec,
-        #                 test=False,
-        #             )
-
-        #             joint_loss = info_db_loss  # +info_con_loss
-
-        #             losses.append([info_db_loss])
-        #             self.backward(joint_loss)
-        #             self.update_params()
-        #             if num % 50 == 0:
-        #                 print(
-        #                     "info db loss is %f"
-        #                     % (sum([l[0] for l in losses]) / len(losses))
-        #                 )
-        #                 # print('info con loss is %f'%(sum([l[1] for l in losses])/len(losses)))
-        #                 losses = []
-        #             num += 1
-
-        #     # print("masked loss pre-trained")
 
         print("Recommendation training ......")
 
@@ -365,19 +288,15 @@ class TrainLoop_fusion_rec:
                     print(
                         "rec loss is %f" % (sum([l[0] for l in losses]) / len(losses))
                     )
-                    # print(
-                    #     "info db loss is %f"
-                    #     % (sum([l[1] for l in losses]) / len(losses))
-                    # )
                     losses = []
-                if iterations % 400 == 0:
-                    print(f"Evaluate model on test set at {iterations} step....")
-                    output_metrics_rec = self.val(is_test=True)
-                    self.logs[iterations] = {
-                        "recall@1": output_metrics_rec["recall@1"],
-                        "recall@10": output_metrics_rec["recall@10"],
-                        "recall@50": output_metrics_rec["recall@50"],
-                    }
+                # if iterations % 400 == 0:
+                #     print(f"Evaluate model on test set at {iterations} step....")
+                #     output_metrics_rec = self.val(is_test=True)
+                #     self.logs[iterations] = {
+                #         "recall@1": output_metrics_rec["recall@1"],
+                #         "recall@10": output_metrics_rec["recall@10"],
+                #         "recall@50": output_metrics_rec["recall@50"],
+                #     }
                 num += 1
 
             output_metrics_rec = self.val()

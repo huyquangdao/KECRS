@@ -1,3 +1,4 @@
+%%writefile model.py
 from models.transformer import (
     TorchGeneratorModel,
     _build_encoder,
@@ -10,6 +11,7 @@ from models.utils import _create_embeddings, _create_entity_embeddings
 from models.graph import SelfAttentionLayer, SelfAttentionLayer_batch
 from torch_geometric.nn.conv.rgcn_conv import RGCNConv
 from torch_geometric.nn.conv.gcn_conv import GCNConv
+from torch_geometric.nn import GATConv
 import pickle as pkl
 import torch
 import torch.nn as nn
@@ -18,6 +20,11 @@ import os
 from collections import defaultdict
 import numpy as np
 import json
+
+from torch_geometric.utils import negative_sampling
+
+import wandb
+
 
 
 def _load_kg_embeddings(entity2entityId, dim, embedding_path):
@@ -34,8 +41,37 @@ def _load_kg_embeddings(entity2entityId, dim, embedding_path):
     return kg_embeddings
 
 
-EDGE_TYPES = [58, 172]
+def compute_edge_type_aware_attn(query, key, value, weight_matrix, mask=None):
+    """[a function computes attentive representations from the inputs]
 
+    Args:
+        query ([type]): [query tensor]
+        key ([type]): [key tensor]
+        value ([type]): [value tensor]
+        weight_matrix ([type]): [model parameters]
+
+    Raises:
+        ValueError: [description]
+
+    Returns:
+        [type]: [a tensor of weighted representations]
+    """
+
+    proj_query = weight_matrix(query)
+    attention_map = torch.bmm(proj_query, key.permute(0, 2, 1))
+
+    if mask is not None:
+
+        mask = mask.unsqueeze(1).repeat(1, proj_query.shape[1], 1)
+        attention_map = attention_map.masked_fill(mask > 0, -1e10)
+    attention_map = torch.softmax(attention_map, dim=-1)
+
+    attentive_representation = torch.bmm(attention_map, value)
+
+    return attentive_representation, attention_map
+
+
+EDGE_TYPES = [58, 172]
 
 def _edge_list(kg, n_entity, hop):
     edge_list = []
@@ -44,12 +80,12 @@ def _edge_list(kg, n_entity, hop):
             # add self loop
             # edge_list.append((entity, entity))
             # self_loop id = 185
-            edge_list.append((entity, entity, 185))
+            edge_list.append((entity, entity, 85))
             if entity not in kg:
                 continue
             for tail_and_relation in kg[entity]:
                 if (
-                    entity != tail_and_relation[1] and tail_and_relation[0] != 185
+                    entity != tail_and_relation[1] and tail_and_relation[0] != 85
                 ):  # and tail_and_relation[0] in EDGE_TYPES:
                     edge_list.append(
                         (entity, tail_and_relation[1], tail_and_relation[0])
@@ -57,7 +93,8 @@ def _edge_list(kg, n_entity, hop):
                     edge_list.append(
                         (tail_and_relation[1], entity, tail_and_relation[0])
                     )
-
+    
+    print(len(edge_list))
     relation_cnt = defaultdict(int)
     relation_idx = {}
     for h, t, r in edge_list:
@@ -69,6 +106,30 @@ def _edge_list(kg, n_entity, hop):
     return [
         (h, t, relation_idx[r]) for h, t, r in edge_list if relation_cnt[r] > 1000
     ], len(relation_idx)
+
+
+def _edge_list_word_item(kg, n_entity, hop):
+    edges = []
+    for h in range(hop):
+        for entity in range(n_entity):
+            # add self loop
+            # edge_list.append((entity, entity))
+            # self_loop id = 185
+            if str(entity) not in kg:
+                continue
+            for neighbor in kg[str(entity)]:
+              # and tail_and_relation[0] in EDGE_TYPES:
+                edges.append(
+                    (entity, neighbor )
+                )
+                edges.append(
+                    (neighbor, entity)
+                )
+    
+    return edges
+
+#     edge_set = [[co[0] for co in list(edges)], [co[1] for co in list(edges)]]
+#     return torch.LongTensor(edge_set).cuda()
 
 
 def concept_edge_list4GCN():
@@ -85,8 +146,19 @@ def concept_edge_list4GCN():
         edges.add((entity0, entity1))
         edges.add((entity1, entity0))
     edge_set = [[co[0] for co in list(edges)], [co[1] for co in list(edges)]]
-    return torch.LongTensor(edge_set).cuda() 
+    return torch.LongTensor(edge_set).cuda()
 
+
+def compute_context_aware_entities_representation(context_query, user_representations, weight_matrix):
+    #context_query = [self.dim]
+    #user_representation = list(self.dim)
+    #weight_vector = [2 * self.dim]
+    proj_representation = torch.tanh(weight_matrix(user_representations))
+    # proj_representation = [n_entity, self.dim]
+    attention_weight = torch.matmul(weight_matrix(context_query).unsqueeze(0), proj_representation.permute(1,0))
+    #attention_weight = [1, n_entity]
+    attention_representation = torch.matmul(attention_weight, user_representations).squeeze(0)
+    return attention_representation
 
 class CrossModel(nn.Module):
     def __init__(
@@ -121,7 +193,7 @@ class CrossModel(nn.Module):
         )
         self.concept_padding = 0
 
-        self.kg = pkl.load(open("data/subkg.pkl", "rb"))
+        self.kg = pkl.load(open("generated_data/final_2_hop_subkg.pkl", "rb"))
 
         if opt.get("n_positions"):
             # if the number of positions is explicitly provided, use that
@@ -226,6 +298,8 @@ class CrossModel(nn.Module):
         if is_finetune:
             params = [
                 self.dbpedia_RGCN.parameters(),
+                self.dbpedia_RGCN2.parameters(),
+                self.w_proj.parameters(),
                 self.concept_GCN.parameters(),
                 self.concept_embeddings.parameters(),
                 self.self_attn.parameters(),
@@ -547,6 +621,8 @@ class CrossModel(nn.Module):
         encoder_states = prev_enc if prev_enc is not None else self.encoder(xs)
 
         # graph network
+#         db_nodes_features = self.dbpedia_RGCN(None, self.db_edge_idx, self.db_edge_type)
+
         db_nodes_features_1 = torch.relu(self.dbpedia_RGCN(None, self.db_edge_idx, self.db_edge_type))
         db_nodes_features_2 = torch.relu(self.dbpedia_RGCN2(db_nodes_features_1, self.db_edge_idx, self.db_edge_type))
 
@@ -625,24 +701,27 @@ class CrossModel(nn.Module):
             # use teacher forcing
             scores, preds = self.decode_forced(
                 encoder_states,
-                (None, None),
-                (None, None),
-                (None, None),
+                (None, None), 
+                db_encoding, 
+                None,
                 db_user_emb,
                 mask_ys,
             )
             gen_loss = torch.mean(self.compute_loss(scores, mask_ys))
+#             scores, preds = None, None
+#             gen_loss = 0
 
         else:
             scores, preds = self.decode_greedy(
                 encoder_states,
-                (None, None),
-                (None, None),
-                (None, None),
+                (None, None), 
+                db_encoding, 
+                None,
                 db_user_emb,
                 bsz,
                 maxlen or self.longest_label,
             )
+#             scores, preds = None, None
             gen_loss = None
 
         return (

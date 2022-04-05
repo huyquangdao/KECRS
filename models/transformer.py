@@ -1,3 +1,4 @@
+%%writefile models/transformer.py
 # Copyright (c) Facebook, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
@@ -896,27 +897,28 @@ class TransformerDecoderLayerKG(nn.Module):
         x = x + residual
         x = _normalize(x, self.norm1)
 
-        # residual = x
-        # x = self.encoder_db_attention(
-        #     query=x,
-        #     key=db_encoder_output,
-        #     value=db_encoder_output,
-        #     mask=db_encoder_mask,
-        # )
-        # x = self.dropout(x)  # --dropout
-        # x = residual + x
-        # x = _normalize(x, self.norm2_db)
-
-        # residual = x
-        # x = self.encoder_kg_attention(
-        #     query=x,
-        #     key=kg_encoder_output,
-        #     value=kg_encoder_output,
-        #     mask=kg_encoder_mask,
-        # )
-        # x = self.dropout(x)  # --dropout
-        # x = residual + x
-        # x = _normalize(x, self.norm2_kg)
+        residual = x
+        x = self.encoder_db_attention(
+            query=x,
+            key=db_encoder_output,
+            value=db_encoder_output,
+            mask=db_encoder_mask,
+        )
+        x = self.dropout(x)  # --dropout
+        x = residual + x
+        x = _normalize(x, self.norm2_db)
+        
+        ##ignore the concept net encoding
+#         residual = x
+#         x = self.encoder_kg_attention(
+#             query=x,
+#             key=kg_encoder_output,
+#             value=kg_encoder_output,
+#             mask=kg_encoder_mask,
+#         )
+#         x = self.dropout(x)  # --dropout
+#         x = residual + x
+#         x = _normalize(x, self.norm2_kg)
 
         residual = x
         x = self.encoder_attention(
