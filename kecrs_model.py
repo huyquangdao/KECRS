@@ -251,7 +251,7 @@ class CrossModel(nn.Module):
 
         self.representation_bias = nn.Linear(opt["embedding_size"], len(dictionary) + 4)
 
-        self.info_con_norm = nn.Linear(opt["dim"], opt["dim"])
+        self.info_con_norm = nn.Linear(opt["dim"], opt["embedding_size"])
         self.info_db_norm = nn.Linear(opt["dim"], opt["embedding_size"])
         self.info_output_db = nn.Linear(opt["dim"], opt["n_entity"])
         self.info_output_con = nn.Linear(opt["dim"], opt["n_concept"] + 1)
