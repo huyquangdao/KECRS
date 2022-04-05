@@ -151,6 +151,8 @@ class TrainLoop_fusion_rec:
         self.log_file_name = f"logs/log_for_{opt['type_sampling']}_{opt['max_neighbors']}_neighbors.json"
         self.logs = {}
 
+        self.random_seed = self.opt["random_seed"]
+
         self.train_MIM = self.opt["train_mim"]
         self.info_loss_ratio = self.opt["info_loss_ratio"]
 
@@ -557,6 +559,7 @@ class TrainLoop_fusion_gen:
             self.load_data = False
         self.is_finetune = False
 
+        self.random_seed = self.opt['random_seed']
         self.movie_ids = pkl.load(open("data/movie_ids.pkl", "rb"))
         # Note: we cannot change the type of metrics ahead of time, so you
         # should correctly initialize to floats or ints here
@@ -824,11 +827,11 @@ class TrainLoop_fusion_gen:
                 output_dict_gen[key] = self.metrics_gen[key]
         print(output_dict_gen)
 
-        f = open("context_test.txt", "w", encoding="utf-8")
+        f = open(f"kecrs_context_test_{self.random_seed}.txt", "w", encoding="utf-8")
         f.writelines([" ".join(sen) + "\n" for sen in context_sum])
         f.close()
 
-        f = open("output_test.txt", "w", encoding="utf-8")
+        f = open(f"kecrs_output_test_{self.random_seed}.txt", "w", encoding="utf-8")
         f.writelines([" ".join(sen) + "\n" for sen in inference_sum])
         f.close()
         return output_dict_gen
