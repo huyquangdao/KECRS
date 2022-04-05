@@ -398,7 +398,11 @@ class CrossModel(nn.Module):
             # print(mem_logits.size())
             # gate = F.sigmoid(self.gen_gate_norm(scores))
             selection_prob, selection_loss = self.entity_selection_loss(scores, attention_db, all_db_features, one_hop_label, rec )
-            sum_logits = voc_logits + con_logits + 0.1 * selection_prob # * (1 - gate)
+            sum_logits = voc_logits + con_logits + 0.1 * selection_prob * self.mask4entities.unsqueeze(
+                0
+            ).unsqueeze(
+                0
+            )  # * (1 - gate)
             _, preds = sum_logits.max(dim=-1)
             # scores = F.linear(scores, self.embeddings.weight)
             logits.append(sum_logits)
@@ -490,7 +494,7 @@ class CrossModel(nn.Module):
             torch.sum(self.info_db_loss(db_scores, word_label.cuda().float()), dim=-1)
             * mask.cuda()
         )
-        return info_db_loss
+        return torch.mean(info_db_loss)
     
     def entity_selection_loss(self, latent, db_user_emb, db_nodes_features, one_hop_label, mask):
 
@@ -682,7 +686,10 @@ class CrossModel(nn.Module):
             )
 #             scores, preds = None, None
             gen_loss = None
-            entity_selection_loss = None
+            entity_selection_loss = 0
+        
+        
+#         print(entity_selection_loss, embedding_alignment_loss)
 
         return (
             scores,

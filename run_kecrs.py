@@ -781,6 +781,7 @@ class TrainLoop_fusion_gen:
                     db_vec,
                     entity_vector.cuda(),
                     rec,
+                    one_hop_label = one_hop_vec,
                     test=False,
                 )
                 (
