@@ -506,11 +506,14 @@ class CrossModel(nn.Module):
             )
         )
         # #B, S, entity_dim
-        entity_score_1 = torch.softmax(F.linear(entity_score, db_nodes_features, entity_bias.bias), dim =1)
+        entity_score_1 = torch.softmax(torch.matmul(entity_score, db_nodes_features), dim =1)
         # #B, S, n_entities
         entity_score_2 = torch.sigmoid(torch.sum(entity_score_1, dim = 1))
         # #B, n_entities
         selection_loss = torch.sum(entity_selection_criterion(entity_score_2, one_hop_label) * self.mask4entities, dim = -1) * mask
+
+        print(torch.mean(selection_loss))
+
         # ### n_entiteis -> n_words
         return entity_score_1, torch.mean(selection_loss)
 
