@@ -660,7 +660,7 @@ class CRSdataset(Dataset):
             dbpedia_mask,
             rec,
             all_word_ids,
-            all_onehop_word_ids
+            all_onehop_word_ids,
             movies,
         ) = self.data[index]
         entity_vec = np.zeros(self.entity_num)
