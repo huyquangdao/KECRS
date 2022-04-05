@@ -402,6 +402,12 @@ class dataset(object):
                 except:
                     pass
                 # assert 1==0
+            
+            all_onehop_neighbors = []
+            for en in line['entity']:
+                one_hops = self.subkg[en]
+                print(one_hops)
+            
 
 
             data_set.append(
