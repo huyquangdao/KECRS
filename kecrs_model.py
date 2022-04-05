@@ -506,7 +506,7 @@ class CrossModel(nn.Module):
             )
         )
         # #B, S, entity_dim
-        entity_score_1 = torch.softmax(F.linear(entity_score, db_nodes_features, self.entity_selection_bias.bias), dim =1)
+        entity_score_1 = torch.softmax(F.linear(entity_score, db_nodes_features), dim =1)
         # #B, S, n_entities
         entity_score_2 = torch.sigmoid(torch.sum(entity_score_1, dim = 1))
         # #B, n_entities
