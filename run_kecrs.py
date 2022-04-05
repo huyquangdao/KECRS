@@ -87,7 +87,7 @@ def setup_args():
     train.add_argument(
         "-embedding_type", "--embedding_type", type=str, default="random"
     )
-    train.add_argument("-epoch", "--epoch", type=int, default=3)
+    train.add_argument("-epoch", "--epoch", type=int, default=30)
     train.add_argument("-gpu", "--gpu", type=str, default="0,1")
     train.add_argument("-gradient_clip", "--gradient_clip", type=float, default=0.1)
     train.add_argument("-embedding_size", "--embedding_size", type=int, default=300)
@@ -220,7 +220,7 @@ class TrainLoop_fusion_rec:
 
         losses = []
         iterations = 0
-        for i in range(self.epoch):
+        for i in range(3):
             train_set = CRSdataset(
                 self.train_dataset.data_process(),
                 self.opt["n_entity"],
