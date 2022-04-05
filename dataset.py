@@ -405,7 +405,7 @@ class dataset(object):
             
             all_onehop_neighbors = []
             for en in line['entity']:
-                one_hops = [x[1] for x in self.subkg[en]][:100]
+                one_hops = [x[1] for x in self.subkg[en]][:5]
                 all_onehop_neighbors.extend(one_hops)
 
             all_one_hop_word_ids = []
