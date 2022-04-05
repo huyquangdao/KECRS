@@ -285,7 +285,7 @@ class CrossModel(nn.Module):
         self.w_proj = nn.Linear(self.dim * 2, self.dim)
 
         self.w_align = nn.Linear(
-            opt["embedding_size"] + opt["embedding_size"], opt["embedding_size"]
+            opt["dim"] + opt["embedding_size"], opt["embedding_size"]
         )
 
         self.entity_bias = nn.Linear(
@@ -480,7 +480,7 @@ class CrossModel(nn.Module):
 
         sum_logits = logits + con_logits + 0.1 * selection_prob # *(1-gate)
         _, preds = sum_logits.max(dim=2)
-        return logits, preds
+        return logits, preds, selection_loss
 
     def alignment_loss(self, db_user_emb, word_embedding, word_label, mask ):
 
@@ -505,14 +505,15 @@ class CrossModel(nn.Module):
                 -1,
             )
         )
+        
         # #B, S, entity_dim
-        entity_score_1 = torch.softmax(torch.matmul(entity_score, db_nodes_features), dim =1)
+        entity_score_1 = torch.softmax(torch.matmul(entity_score, db_nodes_features.unsqueeze(0).permute(0,2,1)), dim =1)
         # #B, S, n_entities
         entity_score_2 = torch.sigmoid(torch.sum(entity_score_1, dim = 1))
         # #B, n_entities
-        selection_loss = torch.sum(entity_selection_criterion(entity_score_2, one_hop_label) * self.mask4entities, dim = -1) * mask
+        selection_loss = torch.sum(self.entity_selection_criterion(entity_score_2, one_hop_label.cuda()), dim = -1) * mask.cuda()
 
-        print(torch.mean(selection_loss))
+#         print(torch.mean(selection_loss))
 
         # ### n_entiteis -> n_words
         return entity_score_1, torch.mean(selection_loss)
@@ -657,7 +658,7 @@ class CrossModel(nn.Module):
                 db_encoding, 
                 None,
                 db_user_emb,
-                db_nodes_features,
+                self.embeddings.weight,
                 one_hop_label,
                 rec,
                 mask_ys,
@@ -673,7 +674,7 @@ class CrossModel(nn.Module):
                 db_encoding, 
                 None,
                 db_user_emb,
-                db_nodes_features,
+                self.embeddings.weight,
                 one_hop_label,
                 rec,
                 bsz,
