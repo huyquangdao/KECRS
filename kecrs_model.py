@@ -289,7 +289,7 @@ class CrossModel(nn.Module):
         )
 
         self.entity_selection_bias = nn.Linear(
-            1, opt["n_entity"]
+            opt["dim"], opt["n_entity"]
         )
 
         self.entity_selection_criterion = nn.CrossEntropyLoss(reduce=False)
