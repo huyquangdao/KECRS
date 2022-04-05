@@ -253,7 +253,7 @@ class CrossModel(nn.Module):
 
         self.info_con_norm = nn.Linear(opt["dim"], opt["embedding_size"])
         self.info_db_norm = nn.Linear(opt["dim"], opt["embedding_size"])
-        self.info_output_db = nn.Linear(opt["dim"], opt["n_entity"])
+        self.info_output_db = nn.Linear(opt["dim"], len(dictionary) + 4)
         self.info_output_con = nn.Linear(opt["dim"], opt["n_concept"] + 1)
         self.info_con_loss = nn.MSELoss(size_average=False, reduce=False)
         self.info_db_loss = nn.MSELoss(size_average=False, reduce=False)
@@ -284,6 +284,16 @@ class CrossModel(nn.Module):
 
         self.w_proj = nn.Linear(self.dim * 2, self.dim)
 
+        self.w_align = nn.Linear(
+            opt["embedding_size"] + opt["embedding_size"], opt["embedding_size"]
+        )
+
+        self.entity_selection_bias = nn.Linear(
+            1, opt["n_entity"]
+        )
+
+        self.entity_selection_criterion = nn.CrossEntropyLoss(reduce=False)
+
         # self.concept_RGCN=RGCNConv(opt['n_concept']+1, self.dim, self.n_con_relation, num_bases=opt['num_bases'])
         self.concept_edge_sets = concept_edge_list4GCN()
         self.concept_GCN = GCNConv(self.dim, self.dim)
@@ -293,6 +303,8 @@ class CrossModel(nn.Module):
 
         self.mask4key = torch.Tensor(np.load("mask4key.npy")).cuda()
         self.mask4movie = torch.Tensor(np.load("mask4movie.npy")).cuda()
+        self.mask4entities = torch.Tensor(np.load("mask4entities.npy")).cuda()
+
         self.mask4 = self.mask4key + self.mask4movie
         if is_finetune:
             params = [
@@ -322,6 +334,9 @@ class CrossModel(nn.Module):
         encoder_states_db,
         attention_kg,
         attention_db,
+        all_db_features,
+        one_hop_label,
+        rec,
         bsz,
         maxlen,
     ):
@@ -382,25 +397,10 @@ class CrossModel(nn.Module):
             # print(logits.size())
             # print(mem_logits.size())
             # gate = F.sigmoid(self.gen_gate_norm(scores))
-
-            sum_logits = voc_logits + con_logits  # * (1 - gate)
+            selection_prob, selection_loss = self.entity_selection_loss(scores, attention_db, all_db_features, one_hop_label, rec )
+            sum_logits = voc_logits + con_logits + 0.1 * selection_prob # * (1 - gate)
             _, preds = sum_logits.max(dim=-1)
             # scores = F.linear(scores, self.embeddings.weight)
-
-            # print(attention_map)
-            # print(db_attention_map)
-            # print(preds.size())
-            # print(con_logits.size())
-            # exit()
-            # print(con_logits.squeeze(0).squeeze(0)[preds.squeeze(0).squeeze(0)])
-            # print(voc_logits.squeeze(0).squeeze(0)[preds.squeeze(0).squeeze(0)])
-
-            # print(torch.topk(voc_logits.squeeze(0).squeeze(0),k=50)[1])
-
-            # sum_logits = scores
-            # print(sum_logits.size())
-
-            # _, preds = sum_logits.max(dim=-1)
             logits.append(sum_logits)
             xs = torch.cat([xs, preds], dim=1)
             # check if everyone has generated an end token
@@ -417,6 +417,9 @@ class CrossModel(nn.Module):
         encoder_states_db,
         attention_kg,
         attention_db,
+        all_db_features,
+        one_hop_label,
+        rec,
         ys,
     ):
         """
@@ -449,20 +452,8 @@ class CrossModel(nn.Module):
             inputs, encoder_states, encoder_states_kg, encoder_states_db
         )  # batch*r_l*hidden
 
-        # kg_attention_latent = self.kg_attn_norm(attention_kg)
-
-        # map=torch.bmm(latent,torch.transpose(kg_embs_norm,2,1))
-        # map_mask=((1-encoder_states_kg[1].float())*(-1e30)).unsqueeze(1)
-        # attention_map=F.softmax(map*map_mask,dim=-1)
-        # attention_latent=torch.bmm(attention_map,encoder_states_kg[0])
 
         db_attention_latent = self.db_attn_norm(attention_db)
-
-        # db_map=torch.bmm(latent,torch.transpose(db_embs_norm,2,1))
-        # db_map_mask=((1-encoder_states_db[1].float())*(-1e30)).unsqueeze(1)
-        # db_attention_map=F.softmax(db_map*db_map_mask,dim=-1)
-        # db_attention_latent=torch.bmm(db_attention_map,encoder_states_db[0])
-
         copy_latent = self.copy_norm(
             torch.cat(
                 [
@@ -485,38 +476,11 @@ class CrossModel(nn.Module):
         # print(mem_logits.size())
         # gate=F.sigmoid(self.gen_gate_norm(latent))
 
-        sum_logits = logits + con_logits  # *(1-gate)
+        selection_prob, selection_loss = self.entity_selection_loss(latent, attention_db, all_db_features, one_hop_label, rec )
+
+        sum_logits = logits + con_logits + 0.1 * selection_prob # *(1-gate)
         _, preds = sum_logits.max(dim=2)
         return logits, preds
-
-    # def infomax_loss(
-    #     self,
-    #     con_nodes_features,
-    #     db_nodes_features,
-    #     con_user_emb,
-    #     db_user_emb,
-    #     con_label,
-    #     db_label,
-    #     mask,
-    # ):
-    #     # batch*dim
-    #     # node_count*dim
-    #     con_emb = self.info_con_norm(con_user_emb)
-    #     db_emb = self.info_db_norm(db_user_emb)
-    #     con_scores = F.linear(db_emb, con_nodes_features, self.info_output_con.bias)
-    #     db_scores = F.linear(con_emb, db_nodes_features, self.info_output_db.bias)
-
-    #     info_db_loss = (
-    #         torch.sum(self.info_db_loss(db_scores, db_label.cuda().float()), dim=-1)
-    #         * mask.cuda()
-    #     )
-    #     info_con_loss = (
-    #         torch.sum(self.info_con_loss(con_scores, con_label.cuda().float()), dim=-1)
-    #         * mask.cuda()
-    #     )
-
-    #     return torch.mean(info_db_loss), torch.mean(info_con_loss)
-
 
     def alignment_loss(self, db_user_emb, word_embedding, word_label, mask ):
 
@@ -526,32 +490,29 @@ class CrossModel(nn.Module):
             torch.sum(self.info_db_loss(db_scores, word_label.cuda().float()), dim=-1)
             * mask.cuda()
         )
-
         return info_db_loss
-        # return 0
     
-
     def entity_selection_loss(self, latent, db_user_emb, db_nodes_features, one_hop_label, mask):
 
-        # seqlen = latent.size(1)
-        # entity_score = self.entity_selection_norm(
-        #     torch.cat(
-        #         [
-        #             # kg_attention_latent.unsqueeze(1).repeat(1, seqlen, 1),
-        #             db_user_emb.unsqueeze(1).repeat(1, seqlen, 1),
-        #             latent,
-        #         ],
-        #         -1,
-        #     )
-        # )
+        seqlen = latent.size(1)
+        entity_score = self.w_align(
+            torch.cat(
+                [
+                    # kg_attention_latent.unsqueeze(1).repeat(1, seqlen, 1),
+                    db_user_emb.unsqueeze(1).repeat(1, seqlen, 1),
+                    latent,
+                ],
+                -1,
+            )
+        )
         # #B, S, entity_dim
-        # entity_score = torch.matmul(entity_score, db_nodes_features.permute(1,0))
+        entity_score_1 = torch.softmax(F.linear(entity_score, db_nodes_features, self.entity_selection_bias.bias), dim =1)
         # #B, S, n_entities
-        # entity_score = torch.sigmoid(torch.sum(entity_score, dim = 1))
+        entity_score_2 = torch.sigmoid(torch.sum(entity_score_1, dim = 1))
         # #B, n_entities
-
+        selection_loss = torch.sum(entity_selection_criterion(entity_score_2, one_hop_label) * self.mask4entities, dim = -1) * mask
         # ### n_entiteis -> n_words
-        return 0
+        return entity_score_1, torch.mean(selection_loss)
 
 
     def forward(
@@ -567,6 +528,7 @@ class CrossModel(nn.Module):
         db_label,
         entity_vector,
         rec,
+        one_hop_label,
         test=True,
         cand_params=None,
         prev_enc=None,
@@ -661,17 +623,7 @@ class CrossModel(nn.Module):
         # mask_mask=concept_mask!=self.concept_padding
         mask_loss = 0  # self.mask_predict_loss(m_emb, attention, xs, mask_mask.cuda(),rec.float())
 
-        # info_db_loss, info_con_loss = self.infomax_loss(
-        #     con_nodes_features,
-        #     db_nodes_features,
-        #     con_user_emb,
-        #     db_user_emb,
-        #     con_label,
-        #     db_label,
-        #     db_con_mask,
-        # )
-        embedding_alignment_loss = self.alignment_loss(db_user_emb, self.embeddings.weight, con_label, db_con_mask)
-        entity_selection_loss = 0
+        embedding_alignment_loss = self.alignment_loss(user_emb, self.embeddings.weight, con_label, db_con_mask)
 
         # entity_scores = F.softmax(entity_scores.cuda(), dim=-1).cuda()
 
@@ -696,12 +648,15 @@ class CrossModel(nn.Module):
 
         if test == False:
             # use teacher forcing
-            scores, preds = self.decode_forced(
+            scores, preds, entity_selection_loss = self.decode_forced(
                 encoder_states,
                 (None, None), 
                 db_encoding, 
                 None,
                 db_user_emb,
+                db_nodes_features,
+                one_hop_label,
+                rec,
                 mask_ys,
             )
             gen_loss = torch.mean(self.compute_loss(scores, mask_ys))
@@ -715,11 +670,15 @@ class CrossModel(nn.Module):
                 db_encoding, 
                 None,
                 db_user_emb,
+                db_nodes_features,
+                one_hop_label,
+                rec,
                 bsz,
                 maxlen or self.longest_label,
             )
 #             scores, preds = None, None
             gen_loss = None
+            entity_selection_loss = None
 
         return (
             scores,

@@ -244,6 +244,7 @@ class TrainLoop_fusion_rec:
                 dbpedia_mask,
                 concept_vec,
                 db_vec,
+                one_hop_vec,
                 rec,
             ) in tqdm(train_dataset_loader):
                 seed_sets = []
@@ -276,6 +277,7 @@ class TrainLoop_fusion_rec:
                     db_vec,
                     entity_vector.cuda(),
                     rec,
+                    one_hop_label = one_hop_vec,
                     test=False,
                 )
 
@@ -291,14 +293,7 @@ class TrainLoop_fusion_rec:
                         "rec loss is %f" % (sum([l[0] for l in losses]) / len(losses))
                     )
                     losses = []
-                # if iterations % 400 == 0:
-                #     print(f"Evaluate model on test set at {iterations} step....")
-                #     output_metrics_rec = self.val(is_test=True)
-                #     self.logs[iterations] = {
-                #         "recall@1": output_metrics_rec["recall@1"],
-                #         "recall@10": output_metrics_rec["recall@10"],
-                #         "recall@50": output_metrics_rec["recall@50"],
-                #     }
+
                 num += 1
 
             output_metrics_rec = self.val()
@@ -392,6 +387,7 @@ class TrainLoop_fusion_rec:
             dbpedia_mask,
             concept_vec,
             db_vec,
+            one_hop_vec,
             rec,
         ) in val_dataset_loader:
             with torch.no_grad():
@@ -421,6 +417,7 @@ class TrainLoop_fusion_rec:
                     db_vec,
                     entity_vector.cuda(),
                     rec,
+                    one_hop_label = one_hop_vec,
                     test=True,
                     maxlen=20,
                     bsz=batch_size,
@@ -639,6 +636,7 @@ class TrainLoop_fusion_gen:
                 dbpedia_mask,
                 concept_vec,
                 db_vec,
+                one_hop_vec,
                 rec,
             ) in tqdm(train_dataset_loader):
                 seed_sets = []
@@ -670,6 +668,7 @@ class TrainLoop_fusion_gen:
                     db_vec,
                     entity_vector.cuda(),
                     rec,
+                    one_hop_label = one_hop_vec,
                     test=False,
                 )
 
@@ -752,6 +751,7 @@ class TrainLoop_fusion_gen:
             dbpedia_mask,
             concept_vec,
             db_vec,
+            one_hop_vec,
             rec,
         ) in tqdm(val_dataset_loader):
             with torch.no_grad():
@@ -804,6 +804,7 @@ class TrainLoop_fusion_gen:
                     db_vec,
                     entity_vector.cuda(),
                     rec,
+                    one_hop_label = one_hop_vec,
                     test=True,
                     maxlen=20,
                     bsz=batch_size,

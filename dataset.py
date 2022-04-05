@@ -403,11 +403,21 @@ class dataset(object):
                     pass
                 # assert 1==0
             
-            # all_onehop_neighbors = []
-            # for en in line['entity']:
-            #     one_hops = self.subkg[en]
-            #     # print(one_hops)
-            
+            all_onehop_neighbors = []
+            for en in line['entity']:
+                one_hops = [x[1] for x in self.subkg[en]]
+                all_onehop_neighbors.extend(one_hops)
+
+            all_one_hop_word_ids = []
+            for en in all_onehop_neighbors:
+                try:
+                    entity = self.entityid2entity[en]
+                    en_words = self.entity_url2text[entity]
+                    words = word_tokenize(en_words)
+                    word_ids = [self.word2index[word] for word in words if word in self.word2index]
+                    all_one_hop_word_ids.extend(word_ids)
+                except:
+                    pass
 
 
             data_set.append(
@@ -424,6 +434,7 @@ class dataset(object):
                     dbpedia_mask,
                     line["rec"],
                     all_word_ids,
+                    all_one_hop_word_ids,
                     movies
                 ]
             )
@@ -649,6 +660,7 @@ class CRSdataset(Dataset):
             dbpedia_mask,
             rec,
             all_word_ids,
+            all_onehop_word_ids
             movies,
         ) = self.data[index]
         entity_vec = np.zeros(self.entity_num)
@@ -663,6 +675,10 @@ class CRSdataset(Dataset):
         concept_vec = np.zeros(self.word_num)
         for word_idx in all_word_ids:
             concept_vec[word_idx] = 1
+        
+        onehop_vec = np.zeros(self.word_num)
+        for word_idx in all_onehop_word_ids:
+            onehop_vec[word_idx] = 1
 
         db_vec = np.zeros(self.entity_num)
         for db in entity:
@@ -683,6 +699,7 @@ class CRSdataset(Dataset):
             np.array(dbpedia_mask),
             concept_vec,
             db_vec,
+            onehop_vec,
             rec,
         )
 
