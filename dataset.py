@@ -11,6 +11,7 @@ from copy import deepcopy
 from collections import defaultdict
 from random import shuffle
 import random
+import argparse
 
 from tqdm import tqdm
 
@@ -111,6 +112,8 @@ class dataset(object):
         self.max_count = opt["max_count"]
         self.entity_num = opt["n_entity"]
         self.max_neighbors = opt["max_neighbors"]
+
+        self.entity_url2text = json.load(open('entity_url2text.json'))
         
         with open('generated_data/final_review_2_movie_entities.json','r') as f:
             self.review2entities = json.load(f)
@@ -385,19 +388,22 @@ class dataset(object):
             assert len(concept_mask) == self.max_c_length
             assert len(dbpedia_mask) == self.max_c_length
             
-            #retrive keywords associated with movies
             all_key_words = []
             movies = []
-            for entity in line['entity']:
+            #retrive keywords associated with movies
+            all_word_ids = []
+            for en in line['entity']:
                 try:
-                    key_words = self.word_item_edge_list[str(entity)]
-                    all_key_words.extend(key_words)
+                    entity = self.entityid2entity[en]
+                    en_words = self.entity_url2text[entity]
+                    print(en_words)
+                    words = word_tokenize(en_words)
+                    word_ids = [self.word2index[word] for word in words if word in self.word2index]
+                    all_word_ids.extend(word_ids)
                 except:
-                    all_key_words.extend([])
-            
-            all_key_words = [self.key2index[x] + 40000 for x in all_key_words]
-            random.shuffle(all_key_words)
-            all_key_words = all_key_words[:int(0.4 * len(all_key_words))]     
+                    pass
+                # assert 1==0
+
 
             data_set.append(
                 [
@@ -412,8 +418,8 @@ class dataset(object):
                     concept_mask,
                     dbpedia_mask,
                     line["rec"],
-                    all_key_words,
-                    movies,
+                    all_word_ids,
+                    movies
                 ]
             )
         return data_set
@@ -615,6 +621,8 @@ class CRSdataset(Dataset):
         self.entity_max = 40000
         self.word_item_offset = 40000
         self.max_neighbors = 10
+        self.word_offset = 4
+        self.word_num = self.word_offset  + 23925
 
     def __getitem__(self, index):
         """
@@ -636,7 +644,7 @@ class CRSdataset(Dataset):
             concept_mask,
             dbpedia_mask,
             rec,
-            key_words,
+            all_word_ids,
             movies,
         ) = self.data[index]
         entity_vec = np.zeros(self.entity_num)
@@ -648,14 +656,9 @@ class CRSdataset(Dataset):
             entity_vector[point] = en
             point += 1
 
-        concept_vec = np.zeros(self.concept_num + self.word_item_offset)
-        for con in concept_mask:
-            if con != 40000:
-                concept_vec[con] = 1
-        
-        for con in key_words:
-            if con != 0:
-                concept_vec[con] = 1
+        concept_vec = np.zeros(self.word_num)
+        for word_idx in all_word_ids:
+            concept_vec[word_idx] = 1
 
         db_vec = np.zeros(self.entity_num)
         for db in entity:
@@ -683,6 +686,74 @@ class CRSdataset(Dataset):
         return len(self.data)
 
 
+def setup_args():
+    train = argparse.ArgumentParser()
+    train.add_argument("-random_seed", "--random_seed", type=int, default=234)
+    train.add_argument("-max_c_length", "--max_c_length", type=int, default=256)
+    train.add_argument("-max_r_length", "--max_r_length", type=int, default=30)
+    train.add_argument("-batch_size", "--batch_size", type=int, default=32)
+    train.add_argument("-max_count", "--max_count", type=int, default=5)
+    train.add_argument("-use_cuda", "--use_cuda", type=bool, default=True)
+    train.add_argument("-load_dict", "--load_dict", type=str, default=None)
+    train.add_argument("-learningrate", "--learningrate", type=float, default=1e-3)
+    train.add_argument("-optimizer", "--optimizer", type=str, default="adam")
+    train.add_argument("-momentum", "--momentum", type=float, default=0)
+    train.add_argument("-is_finetune", "--is_finetune", type=bool, default=False)
+    train.add_argument(
+        "-embedding_type", "--embedding_type", type=str, default="random"
+    )
+    train.add_argument("-epoch", "--epoch", type=int, default=3)
+    train.add_argument("-gpu", "--gpu", type=str, default="0,1")
+    train.add_argument("-gradient_clip", "--gradient_clip", type=float, default=0.1)
+    train.add_argument("-embedding_size", "--embedding_size", type=int, default=300)
+
+    train.add_argument("-n_heads", "--n_heads", type=int, default=2)
+    train.add_argument("-n_layers", "--n_layers", type=int, default=2)
+    train.add_argument("-ffn_size", "--ffn_size", type=int, default=300)
+
+    train.add_argument("-dropout", "--dropout", type=float, default=0.1)
+    train.add_argument(
+        "-attention_dropout", "--attention_dropout", type=float, default=0.0
+    )
+    train.add_argument("-relu_dropout", "--relu_dropout", type=float, default=0.1)
+
+    train.add_argument(
+        "-learn_positional_embeddings",
+        "--learn_positional_embeddings",
+        type=bool,
+        default=False,
+    )
+    train.add_argument(
+        "-embeddings_scale", "--embeddings_scale", type=bool, default=True
+    )
+
+    train.add_argument("-n_entity", "--n_entity", type=int, default=64368)
+    train.add_argument("-n_relation", "--n_relation", type=int, default=214)
+    train.add_argument("-n_concept", "--n_concept", type=int, default=29308)
+    train.add_argument("-n_con_relation", "--n_con_relation", type=int, default=48)
+    train.add_argument("-dim", "--dim", type=int, default=128)
+    train.add_argument("-n_hop", "--n_hop", type=int, default=2)
+    train.add_argument("-kge_weight", "--kge_weight", type=float, default=1)
+    train.add_argument("-l2_weight", "--l2_weight", type=float, default=2.5e-6)
+    train.add_argument("-n_memory", "--n_memory", type=float, default=32)
+    train.add_argument(
+        "-item_update_mode", "--item_update_mode", type=str, default="0,1"
+    )
+    train.add_argument("-using_all_hops", "--using_all_hops", type=bool, default=True)
+    train.add_argument("-num_bases", "--num_bases", type=int, default=8)
+    train.add_argument("-max_neighbors", "--max_neighbors", type=int, default=10)
+
+    train.add_argument("-train_mim", "--train_mim", type=int, default=1)
+    train.add_argument(
+        "-info_loss_ratio", "--info_loss_ratio", type=float, default=0.025
+    )
+    train.add_argument("-type_sampling", "--type_sampling", type=str, default="random")
+
+    return train
+
 if __name__ == "__main__":
-    ds = dataset("data/train_data.jsonl")
+
+    opt = setup_args().parse_args()
+    ds = dataset("data/train_data.jsonl", vars(opt))
+    ds.data_process()
     print()

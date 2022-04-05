@@ -518,19 +518,17 @@ class CrossModel(nn.Module):
     #     return torch.mean(info_db_loss), torch.mean(info_con_loss)
 
 
-    def alignment_loss(self, db_user_emb, word_embedding, db_label, mask ):
+    def alignment_loss(self, db_user_emb, word_embedding, word_label, mask ):
 
-        # db_emb = self.info_db_norm(db_user_emb)
-        # db_scores = F.linear(db_emb, word_embedding, self.info_output_db.bias)
+        db_emb = self.info_db_norm(db_user_emb)
+        db_scores = F.linear(db_emb, word_embedding, self.info_output_db.bias)
+        info_db_loss = (
+            torch.sum(self.info_db_loss(db_scores, word_label.cuda().float()), dim=-1)
+            * mask.cuda()
+        )
 
-        # info_db_loss = (
-        #     torch.sum(self.info_db_loss(db_scores, db_label.cuda().float()), dim=-1)
-        #     * mask.cuda()
-        # )
-
-        # return info_db_loss
-
-        return 0
+        return info_db_loss
+        # return 0
     
 
     def entity_selection_loss(self, latent, db_user_emb, db_nodes_features, one_hop_label, mask):
@@ -672,7 +670,7 @@ class CrossModel(nn.Module):
         #     db_label,
         #     db_con_mask,
         # )
-        embedding_alignment_loss = self.alignment_loss(db_user_emb, self.embeddings.weight, db_label, db_con_mask)
+        embedding_alignment_loss = self.alignment_loss(db_user_emb, self.embeddings.weight, con_label, db_con_mask)
         entity_selection_loss = 0
 
         # entity_scores = F.softmax(entity_scores.cuda(), dim=-1).cuda()
