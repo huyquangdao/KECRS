@@ -521,7 +521,7 @@ class CrossModel(nn.Module):
 #         print(torch.mean(selection_loss))
 
         # ### n_entiteis -> n_words
-        return temp, torch.mean(selection_loss)
+        return entity_score_1, torch.mean(selection_loss)
 
 
     def forward(
