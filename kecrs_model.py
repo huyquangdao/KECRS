@@ -292,7 +292,7 @@ class CrossModel(nn.Module):
             opt["dim"], opt["n_entity"]
         )
 
-        self.entity_selection_criterion = nn.CrossEntropyLoss(reduce=False)
+        self.entity_selection_criterion = nn.BCEWithLogitsLoss(reduce=False)
 
         # self.concept_RGCN=RGCNConv(opt['n_concept']+1, self.dim, self.n_con_relation, num_bases=opt['num_bases'])
         self.concept_edge_sets = concept_edge_list4GCN()
@@ -510,8 +510,9 @@ class CrossModel(nn.Module):
             )
         )
         
+        temp = torch.matmul(entity_score, db_nodes_features.unsqueeze(0).permute(0,2,1))
         # #B, S, entity_dim
-        entity_score_1 = torch.softmax(torch.matmul(entity_score, db_nodes_features.unsqueeze(0).permute(0,2,1)), dim =1)
+        entity_score_1 = torch.softmax(temp, dim =1)
         # #B, S, n_entities
         entity_score_2 = torch.sigmoid(torch.sum(entity_score_1, dim = 1))
         # #B, n_entities
@@ -520,7 +521,7 @@ class CrossModel(nn.Module):
 #         print(torch.mean(selection_loss))
 
         # ### n_entiteis -> n_words
-        return entity_score_1, torch.mean(selection_loss)
+        return temp, torch.mean(selection_loss)
 
 
     def forward(
